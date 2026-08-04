@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>全物品编码投影生成器</title><link rel="stylesheet" href="styles.css"></head>
+<body><main><header><p class="eyebrow">MINECRAFT 1.21.0 · LITEMATICA</p><h1>全物品编码投影生成器</h1><p>上传从内端向外端排放的水道投影，生成已填满的编码双箱投影。</p></header>
+<section class="card"><h2>1. 项目与版型</h2><div class="form-grid">
+<label>项目名称<input id="projectName" value="全物品编码箱"></label>
+<label>进制<select id="radix"><option value="2">二进制</option><option value="10">十进制</option><option value="12">十二进制</option></select></label>
+<label>线程<select id="threads"></select><small>只有二进制支持多线程；顺时针编号。</small></label>
+<label>版型 / 每线程水道数<select id="waterways"><option value="8">8 水道单片</option><option value="10">10 水道单片</option><option value="12">12 水道单片</option></select></label>
+<label>总码位<input id="digits" type="number" min="1" max="12" value="10"><small id="digitHint">二进制：10、11 或 12 位。</small></label>
+<label id="groupWidthLabel">最大组合位宽<input id="groupWidth" type="number" min="1" max="5" value="5"><small>默认按 Mika 式 5 位组合信号。</small></label>
+</div><button id="createGrid">建立上传网格</button></section>
+<section class="card"><div class="section-heading"><div><h2>2. 水道投影上传</h2><p>只识别单箱与木桶；有效容器必须共线于 X+。每个卡片是一条水道。</p></div><span id="uploadStatus" class="badge">尚未建立</span></div><div id="uploadGrid" class="upload-grid"></div></section>
+<section class="card"><div class="section-heading"><div><h2>3. 编码方案</h2><p>二进制自动搜索 Mika 式位组组合；十进制与十二进制按每个数字位分组。</p></div><button id="planButton" disabled>生成方案</button></div><div id="plan" class="empty">上传全部水道投影后生成方案。</div></section>
+<section class="card"><div class="section-heading"><div><h2>4. 导出</h2><p>ZIP 内含 1.21.0 编码双箱投影、映射表、编码列表与清单。</p></div><button id="exportButton" disabled>下载编码投影包</button></div><p class="template-note">每个双箱：前 50 格为编码物品或命名纸 ×1，第 51 格命名纸 ×5，最后 3 格剪刀 ×1。</p></section>
+</main><template id="cardTemplate"><article class="waterway"><h3></h3><input type="file" accept=".litematic,application/octet-stream"><p class="state">等待上传</p><details><summary>提取预览</summary><ol></ol></details></article></template><script src="app.js"></script></body></html>

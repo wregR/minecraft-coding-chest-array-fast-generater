@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+
+# Local exports produced by the web interface
+exports/
