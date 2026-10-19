@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "codingchest",
+  "version": "${version}",
+  "name": "编码全物品 Coding Chest",
+  "description": "游戏内排版扫描、编码优化、编码箱投影和可撤销创造放置。",
+  "authors": ["wregR"],
+  "environment": "*",
+  "mixins": [{"config":"codingchest.client.mixins.json","environment":"client"}],
+  "entrypoints": {
+    "main": ["dev.codingchest.CodingChest"],
+    "client": ["dev.codingchest.client.CodingChestClient"]
+  },
+  "depends": { "fabricloader": ">=0.16.0", "minecraft": "1.21", "java": ">=21", "fabric-api": "*" }
+}

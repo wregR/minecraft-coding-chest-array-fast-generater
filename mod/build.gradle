@@ -1,0 +1,49 @@
+plugins { id 'fabric-loom' version '1.7.4' }
+version = '0.2.0'
+group = 'dev.codingchest'
+base { archivesName = 'codingchest' }
+repositories { mavenCentral() }
+dependencies {
+    minecraft 'com.mojang:minecraft:1.21'
+    mappings 'net.fabricmc:yarn:1.21+build.9:v2'
+    modImplementation 'net.fabricmc:fabric-loader:0.16.14'
+    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.100.8+1.21'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    testImplementation 'net.fabricmc:fabric-loader-junit:0.16.14'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+loom { splitEnvironmentSourceSets(); mods { codingchest { sourceSet sourceSets.main; sourceSet sourceSets.client } } }
+sourceSets.test {
+    compileClasspath += sourceSets.main.compileClasspath
+    compileClasspath += sourceSets.client.compileClasspath
+    runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.client.runtimeClasspath
+}
+java { toolchain.languageVersion = JavaLanguageVersion.of(21); withSourcesJar() }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 21 }
+processResources { filteringCharset = 'UTF-8'; inputs.property 'version', project.version; filesMatching('fabric.mod.json') { expand version: project.version } }
+test { useJUnitPlatform() }
+// This task deliberately has no Minecraft, Fabric Loader or Fabric API on its runtime classpath.
+sourceSets {
+    coreTest {
+        java.srcDir 'src/test/java'
+        java.include 'dev/codingchest/core/**'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+dependencies {
+    coreTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    coreTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.register('coreTest', Test) {
+    description = 'Runs encoding and geometry tests without loading Minecraft or Fabric.'
+    group = 'verification'
+    testClassesDirs = sourceSets.coreTest.output.classesDirs
+    classpath = sourceSets.coreTest.runtimeClasspath
+    systemProperty 'codingchest.pureTests', 'true'
+    useJUnitPlatform()
+}
+tasks.named('wrapper') {
+    gradleVersion = '8.8'
+    distributionSha256Sum = 'a4b4158601f8636cdeeab09bd76afb640030bb5b144aafe261a5e8af027dc612'
+}

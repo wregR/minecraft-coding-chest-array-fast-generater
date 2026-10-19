@@ -3,3 +3,13 @@ __pycache__/
 
 # Local exports produced by the web interface
 exports/
+
+# Fabric development
+.gradle/
+build/
+run/
+dist/
+mod/logs/
+mod/fabricloader.log
+.idea/
+*.iml
