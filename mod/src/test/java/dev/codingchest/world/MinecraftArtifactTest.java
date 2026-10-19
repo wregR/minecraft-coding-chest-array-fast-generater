@@ -20,6 +20,59 @@ import static org.junit.jupiter.api.Assertions.*;
 class MinecraftArtifactTest {
     @BeforeAll static void bootstrap(){SharedConstants.createGameVersion();Bootstrap.initialize();}
     private List<String> ids(int n){return Registries.ITEM.stream().filter(i->i!=Items.AIR&&new ItemStack(i).getMaxCount()==64).limit(n).map(i->Registries.ITEM.getId(i).toString()).toList();}
+    private List<String> ids16(int n){return Registries.ITEM.stream().filter(i->new ItemStack(i).getMaxCount()==16).limit(n).map(i->Registries.ITEM.getId(i).toString()).toList();}
+    @Test void vanillaComparatorVerifiesEvery16And64MixtureAndEveryRemoval(){
+        var small=ids16(50);var large=ids(50);assertFalse(small.isEmpty());
+        int cases=0,removals=0;
+        for(int size=0;size<=50;size++)for(int n16=0;n16<=size;n16++){
+            // Vanilla 1.21 has fewer than 50 distinct 16-stack items. Repeated IDs here
+            // exercise native capacity at 46..50 occupied 16-stack slots, not address assignment.
+            List<String> names=new ArrayList<>();for(int i=0;i<n16;i++)names.add(small.get(i%small.size()));names.addAll(large.subList(0,size-n16));if(size>0)Collections.rotate(names,n16%size);
+            var stacks=ChestFactory.inventory(new EncoderChest(new Signal("单片",0,1),1,names));
+            assertEquals(54,stacks.size());assertTrue(stacks.stream().allMatch(s->!s.isEmpty()&&s.getCount()<=s.getMaxCount()));
+            var inventory=new SimpleInventory(stacks.toArray(ItemStack[]::new));assertEquals(2,ScreenHandler.calculateComparatorOutput(inventory));
+            for(int slot=0;slot<size;slot++){
+                assertEquals(1,inventory.getStack(slot).getCount());var removed=inventory.removeStack(slot,1);
+                assertEquals(1,removed.getCount());assertEquals(1,ScreenHandler.calculateComparatorOutput(inventory));inventory.setStack(slot,removed);removals++;
+            }
+            cases++;
+        }
+        assertEquals(1326,cases);assertEquals(44200,removals);
+        assertThrows(IllegalArgumentException.class,()->ChestFactory.inventory(new EncoderChest(new Signal("单片",0,1),1,List.of("minecraft:shears"))));
+    }
+    @Test void mixedStackExportRoundtripsAllSlotsMaterialsAndRotations()throws Exception{
+        var lookup=RegistryWrapper.WrapperLookup.of(Registries.REGISTRIES.stream().map(r->r.getReadOnlyWrapper()));
+        List<String> names=new ArrayList<>(ids16(50));names.addAll(ids(101-names.size()));assertEquals(101,new HashSet<>(names).size());
+        for(int radix:new int[]{2,10,14}){
+            var profile=new EncodingProfile(radix,10,1,4,false,List.of());var address=new Address(radix==2?0:1,1,radix==2?0:1);
+            var data=names.stream().map(id->new ItemData(id,new ItemStack(Registries.ITEM.get(net.minecraft.util.Identifier.of(id))).getMaxCount(),"",false)).toList();
+            var project=new LayoutProject(1,"mixed-stack-fixture-"+radix,"minecraft:overworld",profile,List.of(),List.of(new LayoutEntry(address,new Pos(0,0,0),"","fixture",data,List.of(),false)));
+            var plan=EncodingEngine.plan(project);assertEquals((radix==2?1:3)*3,plan.chests().size());
+            for(int rotation=0;rotation<4;rotation++){
+                var blocks=ChestFactory.blocks(plan,BlockPos.ORIGIN,rotation);
+                var root=NbtIo.readCompressed(new ByteArrayInputStream(PlanExporter.litematic(plan,lookup,rotation)),NbtSizeTracker.ofUnlimitedBytes());
+                var region=root.getCompound("Regions").getCompound("encoder");var entities=region.getList("TileEntities",10);
+                Map<BlockPos,NbtCompound> chests=new HashMap<>();for(var element:entities){var e=(NbtCompound)element;if(e.getString("id").equals("minecraft:chest"))chests.put(new BlockPos(e.getInt("x")+region.getCompound("Position").getInt("x"),e.getInt("y"),e.getInt("z")+region.getCompound("Position").getInt("z")),e);}
+                Map<String,Integer> actual=new TreeMap<>();actual.put("minecraft:chest",plan.chests().size()*2);actual.put("minecraft:oak_sign",plan.chests().size()+1);
+                for(var block:blocks)if(!block.sign()){
+                    var raw=chests.get(block.pos()).getList("Items",10);assertEquals(27,raw.size());
+                    for(int slot=0;slot<27;slot++){
+                        ItemStack decoded=ItemStack.fromNbt(lookup,raw.getCompound(slot)).orElseThrow();assertTrue(ItemStack.areEqual(block.items().get(slot),decoded));
+                        String id=decoded.isOf(Items.PAPER)&&decoded.contains(net.minecraft.component.DataComponentTypes.CUSTOM_NAME)?"minecraft:paper [ENCODER 占位]":Registries.ITEM.getId(decoded.getItem()).toString();actual.merge(id,decoded.getCount(),Integer::sum);
+                    }
+                }
+                assertEquals(actual,PlanExporter.materials(plan,rotation));
+                for(int i=0;i<plan.chests().size()*2;i+=2){
+                    var a=blocks.get(i);var b=blocks.get(i+1);var first=ChestBlock.getDoubleBlockType(a.state())==DoubleBlockProperties.Type.FIRST?a:b;var second=first==a?b:a;
+                    var merged=new DoubleInventory(new SimpleInventory(first.items().toArray(ItemStack[]::new)),new SimpleInventory(second.items().toArray(ItemStack[]::new)));
+                    var expected=ChestFactory.inventory(plan.chests().get(i/2));for(int slot=0;slot<54;slot++)assertTrue(ItemStack.areEqual(expected.get(slot),merged.getStack(slot)));
+                    assertEquals(2,ScreenHandler.calculateComparatorOutput(merged));for(int slot=0;slot<plan.chests().get(i/2).items().size();slot++){var removed=merged.removeStack(slot,1);assertEquals(1,ScreenHandler.calculateComparatorOutput(merged));merged.setStack(slot,removed);}
+                }
+                // Retain ignored local artifacts for independent Python verification, never public world data.
+                PlanExporter.export(java.nio.file.Path.of("run/stack16-fixtures/"+radix+"-"+rotation),project,plan,lookup,rotation);
+            }
+        }
+    }
     @Test void emptyFlowerPotKeepsItsItemWhilePottedPlantsRepresentThePlant(){
         assertEquals(Items.FLOWER_POT,WorldScanner.displayItem(Blocks.FLOWER_POT.getDefaultState()));
         assertEquals(Items.POPPY,WorldScanner.displayItem(Blocks.POTTED_POPPY.getDefaultState()));

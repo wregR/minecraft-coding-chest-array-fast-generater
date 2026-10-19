@@ -21,7 +21,7 @@ Select the layout, confirm the encoding, preview the result, and export a schema
 
 Requires **Minecraft Java 1.21 (1.21.0)**, **Fabric Loader 0.16.0+**, **Fabric API for 1.21**, and **Java 21**.
 
-1. Download `codingchest-0.2.0.jar` from the [v0.2.0 release page](https://github.com/wregR/minecraft-coding-chest-array-fast-generater/releases/tag/v0.2.0) and put it in your game's `mods` folder alongside Fabric API.
+1. Download `codingchest-0.3.0.jar` from the [v0.3.0 release page](https://github.com/wregR/minecraft-coding-chest-array-fast-generater/releases/tag/v0.3.0) and put it in your game's `mods` folder alongside Fabric API.
 2. Keep only one version of Coding Chest installed. Do not install `sources.jar`.
 3. Launch the game, enter a world, and press **F6** to open the panel.
 
@@ -41,6 +41,8 @@ The current in-game interface is primarily in Chinese. The steps below describe 
 6. **Generate:** In the output tab (生成 / 保存投影), calculate and preview the result, then generate the schematic for automatic saving. Alternatively, set an origin and rotation and place the array in empty space in Creative mode.
 
 A **slice** is a repeating storage module along a corridor. A **waterway** identifies a destination chest position within that module. Addresses always follow: **group → slice within the group → waterway**.
+
+Upgrading does not automatically restore excluded 16-stack items in old projects. Use the restore-16-stack button (恢复已排除16堆叠) in item review if needed, check duplicate destinations again, then save. You can also review individual entries.
 
 ## Default controls
 
@@ -63,7 +65,7 @@ Rebind these under **Options → Controls → Key Binds → Coding Chest**, or u
 
 The waterway count does not have to equal the base. For example, **5 waterways with base-10 signals** is supported. Binary defaults to 8 waterways. Slices are numbered from the inside outward in each group, and waterway order is adjustable.
 
-Each double chest holds at most **50 distinct encoding items**. Unused positions are filled with named paper. Slot 51 holds 5 named papers; slots 52–54 each hold one pair of shears. Every slot is occupied. Removing one encoding item lowers the comparator output from 2 to 1. Pools larger than 50 items are split across additional chests, never truncated.
+Each double chest holds at most **50 distinct encoding items, one of each**, mixing items that stack to 16 or 64. Unused positions among the first 50 slots contain one named paper each. The last four slots automatically adjust the paper/shears balance to the number of 16-stack items. Every slot is occupied, and removing one of any encoding item lowers the comparator output from 2 to 1. All-64-stack chests keep the original recipe: 5 papers in slot 51 and one pair of shears in each of slots 52–54. Pools larger than 50 items are split across additional chests, never truncated. Material lists reflect the actual filler quantities.
 
 Schematics are saved automatically inside the current game instance:
 
@@ -77,7 +79,7 @@ Projects and selections are stored under `config/codingchest/` and persist after
 
 ## Current limitations
 
-- Encoder generation currently supports only items that stack to 64. Items that stack to 16 and unstackable items are flagged as unsupported.
+- Generation supports items that stack to 16 or 64. Unstackable items and other stack limits are not yet supported.
 - Each item must have one unique destination address. Resolve conflicts before generating. Empty positions do not shift later addresses.
 - Automatic recognition provides suggestions; confirm the first slice, waterways, and direction yourself.
 - Creative placement requires air at every target position. Undo skips conflicts caused by later edits instead of overwriting them.

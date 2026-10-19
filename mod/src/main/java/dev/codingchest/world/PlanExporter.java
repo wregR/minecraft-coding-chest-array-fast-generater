@@ -7,6 +7,9 @@ import com.google.gson.*;
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.*;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.registry.Registries;
+import net.minecraft.item.Items;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.util.math.BlockPos;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -41,14 +44,22 @@ public final class PlanExporter {
         ByteArrayOutputStream out=new ByteArrayOutputStream();NbtIo.writeCompressed(root,out);return out.toByteArray();
     }
     private static NbtCompound xyz(int x,int y,int z) {NbtCompound n=new NbtCompound();n.putInt("x",x);n.putInt("y",y);n.putInt("z",z);return n;}
+    public static Map<String,Integer> materials(EncoderPlan plan,int rotation){
+        Map<String,Integer> result=new TreeMap<>();result.put("minecraft:chest",plan.chests().size()*2);
+        result.put("minecraft:oak_sign",EncoderGeometry.labels(plan,rotation).size());
+        for(EncoderChest chest:plan.chests())for(var stack:ChestFactory.inventory(chest)){
+            String id=stack.isOf(Items.PAPER)&&stack.contains(DataComponentTypes.CUSTOM_NAME)?"minecraft:paper [ENCODER 占位]":Registries.ITEM.getId(stack.getItem()).toString();
+            result.merge(id,stack.getCount(),Integer::sum);
+        }
+        return Collections.unmodifiableMap(result);
+    }
     public static Path export(Path directory,LayoutProject project,EncoderPlan plan,RegistryWrapper.WrapperLookup registry,int rotation) throws IOException {
         Files.createDirectories(directory);Path target=directory.resolve("encoder-"+System.currentTimeMillis()+".zip");
         StringBuilder mapping=new StringBuilder("item_id,group,slice,waterway,code\n"),signals=new StringBuilder("chest,layer,column,field,mask,value,part,item_count,items\n");
         plan.addresses().forEach((id,a)->mapping.append(id).append(',').append(a.group()).append(',').append(a.slice()).append(',').append(a.lane()).append(',').append(quote(a.display(plan.profile()))).append('\n'));
-        Map<String,Integer> materials=new TreeMap<>();materials.put("minecraft:chest",plan.chests().size()*2);
-        materials.put("minecraft:oak_sign",EncoderGeometry.labels(plan,rotation).size());
+        Map<String,Integer> materials=materials(plan,rotation);
         List<EncoderGeometry.Slot> slots=EncoderGeometry.slots(plan);
-        for(int i=0;i<plan.chests().size();i++) {EncoderChest c=plan.chests().get(i);EncoderGeometry.Slot slot=slots.get(i);signals.append(i+1).append(',').append(slot.level()).append(',').append(slot.column()).append(',').append(c.signal().field()).append(',').append(c.signal().mask()).append(',').append(c.signal().value()).append(',').append(c.part()).append(',').append(c.items().size()).append(',').append(quote(String.join(";",c.items()))).append('\n');for(String id:c.items())materials.merge(id,1,Integer::sum);materials.merge("minecraft:paper [ENCODER 占位]",55-c.items().size(),Integer::sum);materials.merge("minecraft:shears",3,Integer::sum);}
+        for(int i=0;i<plan.chests().size();i++) {EncoderChest c=plan.chests().get(i);EncoderGeometry.Slot slot=slots.get(i);signals.append(i+1).append(',').append(slot.level()).append(',').append(slot.column()).append(',').append(c.signal().field()).append(',').append(c.signal().mask()).append(',').append(c.signal().value()).append(',').append(c.part()).append(',').append(c.items().size()).append(',').append(quote(String.join(";",c.items()))).append('\n');}
         StringBuilder material=new StringBuilder("item,count\n");materials.forEach((id,n)->material.append(quote(id)).append(',').append(n).append('\n'));
         try(ZipOutputStream zip=new ZipOutputStream(Files.newOutputStream(target))) {
             put(zip,"encoder.litematic",litematic(plan,registry,rotation));put(zip,"mapping.csv",mapping.toString().getBytes(StandardCharsets.UTF_8));put(zip,"signals.csv",signals.toString().getBytes(StandardCharsets.UTF_8));put(zip,"materials.csv",material.toString().getBytes(StandardCharsets.UTF_8));put(zip,"project.json",GSON.toJson(project).getBytes(StandardCharsets.UTF_8));put(zip,"plan.json",GSON.toJson(plan).getBytes(StandardCharsets.UTF_8));

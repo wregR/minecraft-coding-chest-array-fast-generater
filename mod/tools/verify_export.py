@@ -22,22 +22,26 @@ with zipfile.ZipFile(path) as archive:
     plan = json.loads(archive.read("plan.json"))
     signals = list(csv.DictReader(io.StringIO(archive.read("signals.csv").decode("utf-8"))))
     mappings = list(csv.DictReader(io.StringIO(archive.read("mapping.csv").decode("utf-8"))))
+    materials = list(csv.DictReader(io.StringIO(archive.read("materials.csv").decode("utf-8"))))
     root = read_nbt_gzip(archive.read("encoder.litematic"))
     orientation=json.loads(archive.read("orientation.json")) if "orientation.json" in archive.namelist() else None
 if orientation and len(sys.argv)<=2:rotation=orientation["rotation"]
 profile=project["profile"]
 expected={(g["number"],s,l+(0 if profile["radix"]==2 else 1)) for g in project["groups"] for s in range(1,g["slices"]+1) for l in range(len(g["lanes"]))}
 actual={(e["address"]["group"],e["address"]["slice"],e["address"]["lane"]) for e in project["entries"]}
-assert expected==actual and len(actual)==len(project["entries"]),"Incomplete project"
+assert (not project["groups"] or expected==actual) and len(actual)==len(project["entries"]),"Incomplete project"
 active={}
+max_sizes={}
 for entry in project["entries"]:
     if entry["excluded"]: continue
     assert not entry["issues"],"Unresolved scan issue"
     for item in entry["items"]:
         if item["excluded"]: continue
-        assert item["maxStack"]==64
+        assert item["maxStack"] in (16,64)
         assert item["id"] not in active or active[item["id"]]==entry["address"]
         active[item["id"]]=entry["address"]
+        assert item["id"] not in max_sizes or max_sizes[item["id"]]==item["maxStack"]
+        max_sizes[item["id"]]=item["maxStack"]
 assert active==plan["addresses"]
 assert {r["item_id"]:{"group":int(r["group"]),"slice":int(r["slice"]),"lane":int(r["waterway"])} for r in mappings}==active
 chests=plan["chests"]
@@ -62,6 +66,8 @@ minx,minz=(region["Position"]["x"],region["Position"]["z"]) if orientation else 
 triggered=defaultdict(list)
 pool_counts=Counter()
 field_boxes=Counter()
+actual_materials=Counter({"minecraft:chest":len(chests)*2})
+if orientation: actual_materials["minecraft:oak_sign"]=len(chests)+1
 for chest,row in zip(chests,signals):
     assert row["field"]==chest["signal"]["field"] and int(row["value"])==chest["signal"]["value"] and int(row["mask"])==chest["signal"]["mask"]
     assert row["items"].split(";")==chest["items"]
@@ -85,18 +91,33 @@ for chest,row in zip(chests,signals):
         if slot<count:
             assert stack["id"]==chest["items"][slot] and stack["count"]==1
             assert "minecraft:custom_name" not in stack.get("components",{})
-        elif slot<=50:
-            assert stack["id"]=="minecraft:paper" and stack["count"]==(5 if slot==50 else 1)
+            actual_materials[stack['id']]+=1
+        elif slot<50:
+            assert stack["id"]=="minecraft:paper" and stack["count"]==1
             assert "minecraft:custom_name" in stack.get("components",{})
-        else: assert stack["id"]=="minecraft:shears" and stack["count"]==1
-    fullness=sum((Fraction(s["count"],1 if s["id"]=="minecraft:shears" else 64) for s in items),Fraction())
+            actual_materials["minecraft:paper [ENCODER 占位]"]+=1
+        else:
+            assert stack['id'] in ('minecraft:paper','minecraft:shears')
+            if stack['id']=='minecraft:paper':
+                assert 1<=stack['count']<=64 and 'minecraft:custom_name' in stack.get('components',{})
+                actual_materials["minecraft:paper [ENCODER 占位]"]+=stack['count']
+            else:
+                assert stack['count']==1
+                actual_materials['minecraft:shears']+=1
+    fullness=sum((Fraction(s["count"],max_sizes[s['id']] if slot<count else 1 if s["id"]=="minecraft:shears" else 64) for slot,s in enumerate(items)),Fraction())
+    assert fullness==Fraction(247,64)
     assert 1+(fullness*14//54)==2
-    assert 1+((fullness-Fraction(1,64))*14//54)==1
+    for item_id in chest['items']:assert 1+((fullness-Fraction(1,max_sizes[item_id]))*14//54)==1
+    if all(max_sizes[item_id]==64 for item_id in chest['items']):
+        assert items[50]['id']=='minecraft:paper' and items[50]['count']==5
+        assert all(s['id']=='minecraft:shears' and s['count']==1 for s in items[51:])
     signal=chest["signal"]
     pool_counts[(signal["field"],signal["mask"],signal["value"])]+=count
     field_boxes[signal["field"]]+=1
     for item in chest["items"]: triggered[item].append(signal)
 assert set(triggered)==set(active)
+assert len(materials)==len({r['item'] for r in materials})
+assert {r['item']:int(r['count']) for r in materials}==dict(actual_materials),'Material list does not match exported inventories'
 for item,address in active.items():
     if profile["radix"]==2:
         lane_bits=(profile.get("waterwayCount",0) or 8)-1
@@ -135,4 +156,4 @@ if orientation:
     direction=['东','南','西','北'][rotation%4];axis=['+X','+Z','-X','-Z'][rotation%4]
     check_sign(-1,int(signals[0]['layer'])*2,0,['west','north','east','south'][rotation%4],['起点 #1',f'正方向 {axis}',f'向{direction} / 箱号递增',f'箱面朝{direction}'])
     assert orientation['positiveDirection']==axis
-print(json.dumps({"verified":True,"project_positions":len(actual),"unique_items":len(active),"double_chests":len(chests),"signs":len(chests)+1 if orientation else 0,"filled_slots":len(chests)*54,"encoded_item_copies":sum(len(c["items"]) for c in chests),"size":[sx,sy,sz],"field_boxes":dict(field_boxes),"ss2_to_ss1":True,"data_version":root["MinecraftDataVersion"]},ensure_ascii=False,indent=2))
+print(json.dumps({"verified":True,"project_positions":len(actual),"unique_items":len(active),"items16":sum(n==16 for n in max_sizes.values()),"double_chests":len(chests),"signs":len(chests)+1 if orientation else 0,"filled_slots":len(chests)*54,"encoded_item_copies":sum(len(c["items"]) for c in chests),"size":[sx,sy,sz],"field_boxes":dict(field_boxes),"ss2_to_ss1":True,"materials_verified":True,"data_version":root["MinecraftDataVersion"]},ensure_ascii=False,indent=2))

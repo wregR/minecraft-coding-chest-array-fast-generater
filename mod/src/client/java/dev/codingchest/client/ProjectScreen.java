@@ -2,6 +2,7 @@ package dev.codingchest.client;
 
 import dev.codingchest.core.Model.*;
 import dev.codingchest.core.ProjectAudit;
+import dev.codingchest.core.ChestFilling;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.*;
 import net.minecraft.client.gui.widget.*;
@@ -97,12 +98,13 @@ public final class ProjectScreen extends Screen {
     private void review(){
         Set<String> conflicts=ProjectAudit.conflictingItems(c.project);List<Integer> visible=new ArrayList<>();
         for(int i=0;i<c.project.entries().size();i++){LayoutEntry e=c.project.entries().get(i);boolean conflict=!e.excluded()&&e.items().stream().anyMatch(item->!item.excluded()&&conflicts.contains(item.id()));
-            boolean include=switch(reviewFilter){case 1->!e.excluded()&&!e.issues().isEmpty();case 2->conflict;case 3->!e.excluded()&&e.items().stream().anyMatch(item->!item.excluded()&&item.maxStack()!=64);case 4->e.items().isEmpty();default->true;};if(include)visible.add(i);}
+            boolean include=switch(reviewFilter){case 1->!e.excluded()&&!e.issues().isEmpty();case 2->conflict;case 3->!e.excluded()&&e.items().stream().anyMatch(item->!item.excluded()&&!ChestFilling.supported(item.maxStack()));case 4->e.items().isEmpty();case 5->e.items().stream().anyMatch(item->item.maxStack()==16);default->true;};if(include)visible.add(i);}
         int size=perPage(),total=visible.size();page=Math.max(0,Math.min(page,Math.max(0,(total-1)/size)));
         label(ProjectAudit.summary(c.project),top);
-        button(left,top+16,70,"上一页",()->{page--;rebuild();});button(left+75,top+16,70,"下一页",()->{page++;rebuild();});button(left+150,top+16,160,"排除非64堆叠物品",()->{c.excludeUnsupported();rebuild();});
+        button(left,top+16,70,"上一页",()->{page--;rebuild();});button(left+75,top+16,70,"下一页",()->{page++;rebuild();});button(left+150,top+16,160,"排除不支持堆叠物品",()->{c.excludeUnsupported();rebuild();});
         button(left+315,top+16,200,"重复物品保留首个地址…",()->client.setScreen(new ConfirmScreen(ok->{client.setScreen(this);if(ok){c.keepFirstDestination();rebuild();}},Text.literal("处理重复目标"),Text.literal("只保留同一物品最小的组/单片/水道地址，其余目标标为排除，原排版记录保留。请确认这符合机器的目标选择。"))));
-        String[] filters={"全部","读取问题","重复目标","非64堆叠","空位"};
+        String[] filters={"全部","读取问题","重复目标","不支持堆叠","空位","16堆叠（含已排除）"};
+        button(left+135,top+41,180,"恢复已排除16堆叠…",()->client.setScreen(new ConfirmScreen(ok->{client.setScreen(this);if(ok){c.restoreExcluded16();rebuild();}},Text.literal("恢复16堆叠物品"),Text.literal("恢复未排除位置中所有已排除的16堆叠物品，包括手动排除过的。不会恢复整个已排除位置。可能出现重复目标，请重新校对；原文件在保存前不变。"))));
         button(left,top+41,130,"筛选："+filters[reviewFilter],()->{reviewFilter=(reviewFilter+1)%filters.length;page=0;selected=-1;rebuild();});
         label("筛选结果 "+total+"；第"+(page+1)+"/"+Math.max(1,(total+size-1)/size)+"页；红色待修正、灰色已排除，空位不前移。",top+65);
         for(int i=page*size;i<Math.min(total,(page+1)*size);i++){final int index=visible.get(i);LayoutEntry e=c.project.entries().get(index);boolean conflict=!e.excluded()&&e.items().stream().anyMatch(item->!item.excluded()&&conflicts.contains(item.id()));String ids=e.items().stream().map(item->(item.excluded()?"[已排除]":"")+item.id()).reduce((a,b)->a+";"+b).orElse("空位");String row=(e.excluded()?"[排除] ":!e.issues().isEmpty()?"[待修正] ":conflict?"[冲突] ":"")+e.address().display(c.project.profile())+" "+ids;ButtonWidget b=button(left,top+80+(i-page*size)*21,panelWidth,trim(row,panelWidth-10),()->{selected=index;rebuild();});b.setMessage(Text.literal(trim(row,panelWidth-10)).styled(style->style.withColor(e.excluded()?0x888888:!e.issues().isEmpty()||conflict?0xFF7777:0xFFFFFF)));}

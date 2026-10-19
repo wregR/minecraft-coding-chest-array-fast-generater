@@ -64,10 +64,19 @@ class EncodingEngineTest {
     @Test void emptyPositionsDontShiftOtherAddressesAndUnsupportedRequireExclusion() {
         EncodingProfile p=EncodingProfile.defaults();Address a=new Address(0,3,0);
         EncoderPlan plan=EncodingEngine.plan(project(p,List.of(entry(new Address(0,1,0)),entry(a,"minecraft:stone"))));assertEquals(a,plan.addresses().get("minecraft:stone"));
-        LayoutEntry e=new LayoutEntry(a,new Pos(0,0,0),"","",List.of(new ItemData("minecraft:ender_pearl",16,"",false),new ItemData("minecraft:stone",64,"",false)),List.of(),false);
+        LayoutEntry e=new LayoutEntry(a,new Pos(0,0,0),"","",List.of(new ItemData("minecraft:shears",1,"",false),new ItemData("minecraft:stone",64,"",false)),List.of(),false);
         assertThrows(IllegalArgumentException.class,()->EncodingEngine.plan(project(p,List.of(e))));
-        LayoutEntry excluded=new LayoutEntry(a,e.position(),"","",List.of(new ItemData("minecraft:ender_pearl",16,"",true),new ItemData("minecraft:stone",64,"",false)),List.of(),false);
+        LayoutEntry excluded=new LayoutEntry(a,e.position(),"","",List.of(new ItemData("minecraft:shears",1,"",true),new ItemData("minecraft:stone",64,"",false)),List.of(),false);
         assertEquals(a,EncodingEngine.plan(project(p,List.of(excluded))).addresses().get("minecraft:stone"));
+    }
+    @Test void supportsMixedStacksWithIdenticalAddressesAndSplitsAcrossEncodingBases(){
+        for(int radix:new int[]{2,10,11,12,13,14})for(int amount:new int[]{49,50,51,100,101}){
+            var p=new EncodingProfile(radix,10,1,4,false,List.of());var address=new Address(radix==2?0:1,1,radix==2?0:1);
+            List<ItemData> items=new ArrayList<>();for(int i=0;i<amount;i++)items.add(new ItemData("test:item_"+i,i%2==0?16:64,"",false));
+            var e=new LayoutEntry(address,new Pos(0,0,0),"","fixture",items,List.of(),false);
+            var plan=EncodingEngine.plan(project(p,List.of(e)));assertEquals(amount,plan.addresses().size());
+            assertEquals((radix==2?1:3)*((amount+49)/50),plan.chests().size());EncodingEngine.verify(plan);
+        }
     }
     @Test void manualMasksValidateNonOverlapCoverageAndFieldBoundaries() {
         var entries=List.of(entry(new Address(0,1,0),"minecraft:stone"));

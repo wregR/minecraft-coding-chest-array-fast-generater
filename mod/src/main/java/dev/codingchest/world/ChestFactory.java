@@ -2,6 +2,7 @@ package dev.codingchest.world;
 
 import dev.codingchest.core.Model.*;
 import dev.codingchest.core.EncoderGeometry;
+import dev.codingchest.core.ChestFilling;
 import net.minecraft.block.*;
 import net.minecraft.block.enums.ChestType;
 import net.minecraft.block.entity.SignBlockEntity;
@@ -25,17 +26,18 @@ public final class ChestFactory {
     }
     public static List<ItemStack> inventory(EncoderChest chest) {
         if(chest.items().size()>50)throw new IllegalArgumentException("每箱最多50种编码物品");
-        List<ItemStack> stacks=new ArrayList<>();
+        List<ItemStack> stacks=new ArrayList<>();int count16=0;
         for(int slot=0;slot<50;slot++) {
             if(slot<chest.items().size()) {
                 Identifier id=Identifier.of(chest.items().get(slot));
                 if(!Registries.ITEM.containsId(id))throw new IllegalArgumentException("物品未注册: "+id);
                 ItemStack stack=new ItemStack(Registries.ITEM.get(id));
-                if(stack.isEmpty()||stack.getMaxCount()!=64)throw new IllegalArgumentException("物品不是64堆叠: "+id);
+                if(stack.isEmpty()||!ChestFilling.supported(stack.getMaxCount()))throw new IllegalArgumentException("物品不是16或64堆叠: "+id);
+                if(stack.getMaxCount()==16)count16++;
                 stacks.add(stack);
             } else stacks.add(paper(1));
         }
-        stacks.add(paper(5));for(int i=0;i<3;i++)stacks.add(new ItemStack(Items.SHEARS));
+        for(var filler:ChestFilling.tail(count16))stacks.add(filler.shears()?new ItemStack(Items.SHEARS):paper(filler.count()));
         SimpleInventory inv=new SimpleInventory(stacks.toArray(ItemStack[]::new));
         if(ScreenHandler.calculateComparatorOutput(inv)!=2)throw new IllegalStateException("初始容量不是SS2");
         for(int i=0;i<chest.items().size();i++) {

@@ -1,5 +1,5 @@
 plugins { id 'fabric-loom' version '1.7.4' }
-version = '0.2.0'
+version = '0.3.0'
 group = 'dev.codingchest'
 base { archivesName = 'codingchest' }
 repositories { mavenCentral() }

@@ -19,13 +19,13 @@ public final class EncodingEngine {
             if(a.group()<first||a.group()>=first+p.groups()||a.slice()<1||a.slice()>p.maxSlices()||a.lane()<first||a.lane()>=first+p.lanes()) throw new IllegalArgumentException("地址超出范围: "+a);
             for(ItemData item:e.items()) {
                 if(item.excluded())continue;
-                if(item.maxStack()!=64) throw new IllegalArgumentException("暂不支持非64堆叠物品，请在校对页排除: "+item.id());
+                if(!ChestFilling.supported(item.maxStack())) throw new IllegalArgumentException("仅支持16或64堆叠物品，请在校对页排除: "+item.id());
                 if(!item.id().matches("[a-z0-9_.-]+:[a-z0-9_./-]+")) throw new IllegalArgumentException("无效物品ID: "+item.id());
                 Address previous=addresses.putIfAbsent(item.id(),a);
                 if(previous!=null&&!previous.equals(a)) throw new IllegalArgumentException("物品目标冲突 "+item.id()+": "+previous+" / "+a);
             }
         }
-        if(addresses.isEmpty())throw new IllegalArgumentException("没有参与编码的64堆叠物品");
+        if(addresses.isEmpty())throw new IllegalArgumentException("没有参与编码的16或64堆叠物品");
         List<Integer> masks=p.radix()==2?optimize(p,addresses):List.of();
         List<EncoderChest> chests=makeChests(p,addresses,masks);
         List<Integer> singles=new ArrayList<>(); for(int b=p.totalBits()-1;b>=0;b--) singles.add(1<<b);
